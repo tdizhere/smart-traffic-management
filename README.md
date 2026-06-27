@@ -32,11 +32,11 @@ Modern landing page introducing the system and highlighting key metrics.
 </p>
 
 <p align="center">
-<img src="static/image copy2.png" width="100%">
+<img src="static/image copy 2.png" width="100%">
 </p>
 
 <p align="center">
-<img src="static/image copy3.png" width="100%">
+<img src="static/image copy 3.png" width="100%">
 </p>
 
 ---
@@ -46,9 +46,7 @@ Modern landing page introducing the system and highlighting key metrics.
 The simulation engine visualizes vehicle movement, adaptive traffic lights, congestion, and emergency vehicle prioritization in real time.
 
 <p align="center">
-
-https://github.com/tdizhere/smart-traffic-management/blob/main/simulation-demo.mp4
-
+  <img src="static/simulation.mp4" width="100%">
 </p>
 
 ---
