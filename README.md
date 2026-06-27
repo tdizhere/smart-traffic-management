@@ -47,21 +47,9 @@ The simulation engine visualizes vehicle movement, adaptive traffic lights, cong
 
 <p align="center">
 
-https://github.com/user-attachments/assets/simulation-demo.mp4
+https://github.com/tdizhere/smart-traffic-management/blob/main/simulation-demo.mp4
 
 </p>
-
-> If the video is stored inside the repository instead, replace the link above with:
->
-> ```markdown
-> https://github.com/<username>/<repository>/blob/main/simulation-demo.mp4
-> ```
->
-> or simply
->
-> ```markdown
-> [▶ Watch Simulation Demo](simulation-demo.mp4)
-> ```
 
 ---
 
