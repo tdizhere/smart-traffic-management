@@ -46,7 +46,7 @@ Modern landing page introducing the system and highlighting key metrics.
 The simulation engine visualizes vehicle movement, adaptive traffic lights, congestion, and emergency vehicle prioritization in real time.
 
 <p align="center">
-  <img src="static/simulation.mp4" width="100%">
+  <img src="simulation-demo-ezgif.com-video-to-gif-converter.gif" width="100%">
 </p>
 
 ---
