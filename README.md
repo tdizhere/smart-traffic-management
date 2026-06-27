@@ -122,7 +122,6 @@ smart-city-traffic-management/
 ├
 │
 ├── simulation-demo.mp4
-├── requirements.txt
 └── README.md
 ```
 
@@ -156,7 +155,7 @@ source venv/bin/activate
 Install dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install Flask Flask-SocketIO Flask-Cors opencv-python numpy ultralytics requests
 ```
 
 ---
