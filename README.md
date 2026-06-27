@@ -70,7 +70,7 @@ https://github.com/user-attachments/assets/simulation-demo.mp4
 Compare traffic density, congestion levels, and analytics across multiple lanes.
 
 <p align="center">
-<img src="static/image copy4.png" width="100%">
+<img src="static/image copy 4.png" width="100%">
 </p>
 
 ---
@@ -88,7 +88,7 @@ Features include:
 * Traffic Density Estimation
 
 <p align="center">
-<img src="static/image copy5.png" width="100%">
+<img src="static/image copy 5.png" width="100%">
 </p>
 
 ---
