@@ -1,0 +1,3016 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowMind AI — Intelligent Traffic Management System</title>
+  <meta name="description"
+    content="FlowMind AI uses YOLOv8 and dynamic signal timing to eliminate urban congestion. See the live simulation proof." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg-base: #0c0e12;
+      --bg-panel: #121620;
+      --bg-glass: rgba(38, 46, 63, 0.15);
+      --border: #262e3f;
+      --green: #00e676;
+      --green-dim: rgba(0, 230, 118, 0.1);
+      --red: #ff1744;
+      --red-dim: rgba(255, 23, 68, 0.1);
+      --amber: #ffb300;
+      --blue: #3b9eff;
+      --cyan: #00e5ff;
+      --text-primary: #f5f7fa;
+      --text-muted: #7b8b9a;
+      --text-dim: #3e4a5f;
+      --font: 'Space Grotesk', sans-serif;
+      --font-display: 'Share Tech Mono', monospace;
+      --mono: 'JetBrains Mono', monospace;
+      --radius: 0px;
+      --radius-sm: 0px;
+      --transition: 0.15s ease-in-out;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      background-image:
+        linear-gradient(rgba(38, 46, 63, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(38, 46, 63, 0.05) 1px, transparent 1px);
+      background-size: 30px 30px;
+    }
+
+    /* HEADER */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(12, 14, 18, 0.95);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      height: 64px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 0;
+      border: 1px solid var(--cyan);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .logo span {
+      color: var(--text-muted);
+      font-weight: 400;
+      font-size: 11px;
+      margin-left: 8px;
+      font-family: var(--mono);
+      text-transform: uppercase;
+    }
+
+    .tabs {
+      margin-left: auto;
+      display: flex;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      padding: 8px 16px;
+      border-radius: 0;
+      border: 1px solid var(--border);
+      background: rgba(18, 22, 32, 0.6);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 13px;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-transform: uppercase;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-panel);
+      color: var(--cyan);
+      border-color: var(--cyan);
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: var(--text-primary);
+      border-color: var(--text-muted);
+      background: transparent;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse-dot 2s infinite;
+    }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.5);
+      }
+
+      50% {
+        opacity: 0.5;
+        box-shadow: 0 0 0 4px rgba(0, 230, 118, 0);
+      }
+    }
+
+    /* SECTIONS */
+    .section {
+      display: none;
+      padding: 24px 28px;
+      min-height: calc(100vh - 64px);
+    }
+
+    .section.active {
+      display: block;
+    }
+
+    /* GRID */
+    .yolo-grid {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .sim-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    /* CARDS WITH HUD CORNERS */
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      position: relative;
+      overflow: visible;
+    }
+
+    .card::before,
+    .card::after {
+      content: '';
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-color: var(--cyan);
+      border-style: solid;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .card::before {
+      top: -1px;
+      left: -1px;
+      border-width: 1px 0 0 1px;
+    }
+
+    .card::after {
+      bottom: -1px;
+      right: -1px;
+      border-width: 0 1px 1px 0;
+    }
+
+    .card-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    /* VIDEO */
+    .video-wrapper {
+      position: relative;
+      background: #05070a;
+      border-radius: 0;
+      overflow: hidden;
+      min-height: 380px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+    }
+
+    #yolo-feed {
+      width: 100%;
+      display: block;
+      border-radius: 0;
+    }
+
+    .video-controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      align-items: center;
+    }
+
+    /* BUTTONS */
+    .btn {
+      padding: 9px 18px;
+      border-radius: 0;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 12px;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary {
+      background: var(--green-dim);
+      color: var(--green);
+      border-color: var(--green);
+    }
+
+    .btn-primary:hover {
+      background: var(--green);
+      color: #000;
+      box-shadow: 0 0 12px rgba(0, 230, 118, 0.3);
+    }
+
+    .btn-secondary {
+      background: var(--bg-glass);
+      color: var(--text-primary);
+      border-color: var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .btn-emergency {
+      background: var(--red-dim);
+      color: var(--red);
+      border-color: var(--red);
+      padding: 12px 24px;
+      font-size: 13px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .btn-emergency:hover {
+      background: var(--red);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(255, 23, 68, 0.4);
+    }
+
+    .btn-emergency.active-emerg {
+      animation: emergency-pulse 0.8s infinite;
+    }
+
+    .btn-cancel-emerg {
+      background: rgba(38, 46, 63, 0.4);
+      color: var(--text-muted);
+      border-color: var(--border);
+      padding: 8px 16px;
+      font-size: 11px;
+      width: 100%;
+      justify-content: center;
+      display: none;
+    }
+
+    .btn-cancel-emerg.visible {
+      display: inline-flex;
+    }
+
+    .btn-cancel-emerg:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      border-color: var(--text-muted);
+    }
+
+    @keyframes emergency-pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 10px rgba(255, 23, 68, 0.3);
+      }
+
+      50% {
+        box-shadow: 0 0 25px rgba(255, 23, 68, 0.7);
+      }
+    }
+
+    /* EMERGENCY CORRIDOR GRID */
+    .emerg-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .btn-corridor {
+      padding: 8px 10px;
+      border-radius: 0;
+      border: 1px solid var(--border);
+      background: rgba(255, 23, 68, 0.05);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 11px;
+      transition: var(--transition);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      justify-content: center;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-corridor:hover {
+      background: rgba(255, 23, 68, 0.15);
+      color: var(--red);
+      border-color: var(--red);
+    }
+
+    .btn-corridor.active-corridor {
+      background: var(--red-dim);
+      color: var(--red);
+      border-color: var(--red);
+      animation: emergency-pulse 0.8s infinite;
+    }
+
+    /* VEHICLE COLOR KEY */
+    .color-key {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px 0 0;
+    }
+
+    .color-key-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    .color-swatch {
+      width: 24px;
+      height: 14px;
+      border-radius: 0;
+      flex-shrink: 0;
+    }
+
+    .btn-upload {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-upload input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .quad-selector {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .quad-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 0;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 600;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .quad-btn.active-q {
+      background: var(--green-dim);
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .quad-btn:hover:not(.active-q) {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    /* LANE CARDS */
+    .lane-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .lane-card {
+      border-radius: 0;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      background: rgba(18, 22, 32, 0.4);
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .lane-card.light-green {
+      border-color: var(--green);
+      background: rgba(0, 230, 118, 0.03);
+    }
+
+    .lane-card.light-red {
+      border-color: var(--red);
+      background: rgba(255, 23, 68, 0.02);
+    }
+
+    .lane-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .lane-name {
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      font-family: var(--font-display);
+      color: var(--text-primary);
+    }
+
+    .light-badge {
+      padding: 3px 10px;
+      border-radius: 0;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .light-badge.green {
+      background: var(--green-dim);
+      color: var(--green);
+      border: 1px solid var(--green);
+    }
+
+    .light-badge.red {
+      background: var(--red-dim);
+      color: var(--red);
+      border: 1px solid var(--red);
+    }
+
+    .vehicle-counts {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .v-count {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    .v-count strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .weight-bar-wrap {
+      position: relative;
+    }
+
+    .weight-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    .weight-bar-bg {
+      height: 4px;
+      background: #1a1d24;
+      border-radius: 0;
+      overflow: hidden;
+    }
+
+    .weight-bar-fill {
+      height: 100%;
+      border-radius: 0;
+      transition: width 0.5s ease;
+    }
+
+    .weight-bar-fill.green-fill {
+      background: var(--green);
+    }
+
+    .weight-bar-fill.red-fill {
+      background: var(--red);
+    }
+
+    /* TIMER RING */
+    .timer-ring-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 0;
+      gap: 8px;
+    }
+
+    .timer-ring-svg {
+      transform: rotate(-90deg);
+    }
+
+    .timer-ring-bg {
+      fill: none;
+      stroke: #1a1d24;
+      stroke-width: 4;
+    }
+
+    .timer-ring-fill {
+      fill: none;
+      stroke-width: 4;
+      stroke-linecap: square;
+      transition: stroke-dashoffset 0.9s ease, stroke 0.3s;
+    }
+
+    .timer-val {
+      font-size: 32px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      color: var(--cyan);
+    }
+
+    .timer-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-family: var(--font-display);
+    }
+
+    /* STATS */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .stat-mini {
+      background: rgba(18, 22, 32, 0.4);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 12px 14px;
+      text-align: center;
+    }
+
+    .stat-mini-val {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      color: var(--cyan);
+    }
+
+    .stat-mini-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+      font-family: var(--font-display);
+    }
+
+    /* CANVAS */
+    #sim-canvas {
+      display: block;
+      width: 100%;
+      border-radius: 0;
+      cursor: default;
+    }
+
+    .canvas-wrap {
+      background: #0c0e12;
+      border-radius: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    /* EMERGENCY */
+    .emergency-banner {
+      display: none;
+      padding: 12px 20px;
+      margin-bottom: 16px;
+      background: var(--red-dim);
+      border: 1px solid var(--red);
+      border-radius: 0;
+      font-weight: 700;
+      color: var(--red);
+      font-family: var(--font-display);
+      font-size: 13px;
+      align-items: center;
+      gap: 12px;
+      letter-spacing: 0.5px;
+      animation: emergency-pulse 0.8s infinite;
+    }
+
+    .emergency-banner.visible {
+      display: flex;
+    }
+
+    .emerg-icon {
+      font-size: 16px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* SECTION TITLE */
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-transform: uppercase;
+    }
+
+    .section-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 0;
+      background: var(--green-dim);
+      color: var(--green);
+      border: 1px solid var(--green);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-family: var(--mono);
+    }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+    }
+
+    .sep {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+
+    .active-lane-card {
+      border-color: var(--cyan) !important;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
+    }
+
+    /* =============================================
+       LANDING PAGE (Brutalist HUD Blueprint)
+       ============================================= */
+    .landing-page {
+      padding: 0;
+    }
+
+    .hero {
+      min-height: calc(100vh - 64px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 50% 30%, rgba(0, 229, 255, 0.05), transparent 60%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 0;
+      background: var(--bg-glass);
+      border: 1px solid var(--border);
+      color: var(--cyan);
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      margin-bottom: 28px;
+      text-transform: uppercase;
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 5vw, 70px);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -1px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .hero-title .grad {
+      color: var(--cyan);
+      text-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
+    }
+
+    .hero-sub {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.7;
+      max-width: 640px;
+      margin: 0 auto 40px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-hero-primary {
+      padding: 14px 30px;
+      border-radius: 0;
+      border: 1px solid var(--cyan);
+      background: rgba(0, 229, 255, 0.08);
+      color: var(--cyan);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: var(--transition);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-hero-primary:hover {
+      background: var(--cyan);
+      color: #000;
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+    }
+
+    .btn-hero-secondary {
+      padding: 14px 30px;
+      border-radius: 0;
+      border: 1px solid var(--border);
+      background: rgba(18, 22, 32, 0.6);
+      color: var(--text-primary);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: var(--transition);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-hero-secondary:hover {
+      border-color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 48px;
+      margin-top: 64px;
+      border-top: 1px solid var(--border);
+      padding-top: 40px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .hero-stats>div {
+      padding: 0 24px;
+      border-left: 1px solid var(--border);
+    }
+
+    .hero-stats>div:first-child {
+      border-left: none;
+    }
+
+    .hero-stat-val {
+      font-size: 36px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      color: var(--cyan);
+    }
+
+    .hero-stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 4px;
+      font-family: var(--font-display);
+    }
+
+    /* PROBLEM */
+    .problem-section {
+      padding: 80px 40px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 23, 68, 0.01);
+    }
+
+    .problem-section .container,
+    .solution-section .container,
+    .feature-strip .container,
+    .cta-section .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-eyebrow {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--red);
+      margin-bottom: 12px;
+    }
+
+    .section-heading {
+      font-family: var(--font-display);
+      font-size: clamp(26px, 3.5vw, 44px);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      line-height: 1.1;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }
+
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.7;
+      max-width: 600px;
+      margin-bottom: 48px;
+    }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .problem-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 24px;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .problem-card::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      width: 6px;
+      height: 6px;
+      border-color: var(--red);
+      border-style: solid;
+      border-width: 1px 0 0 1px;
+    }
+
+    .problem-card:hover {
+      border-color: var(--red);
+      box-shadow: 0 0 10px rgba(255, 23, 68, 0.1);
+    }
+
+    .problem-icon {
+      font-size: 24px;
+      margin-bottom: 12px;
+      color: var(--red);
+    }
+
+    .problem-title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      color: var(--text-primary);
+    }
+
+    .problem-desc {
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .problem-metric {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .problem-metric-val {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--red);
+      font-family: var(--font-display);
+    }
+
+    .problem-metric-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-display);
+      text-transform: uppercase;
+    }
+
+    /* SOLUTION */
+    .solution-section {
+      padding: 80px 40px;
+    }
+
+    .solution-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .solution-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .solution-step {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 0;
+      flex-shrink: 0;
+      background: rgba(0, 229, 255, 0.05);
+      border: 1px solid var(--cyan);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--cyan);
+      font-family: var(--font-display);
+    }
+
+    .step-content-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      color: var(--text-primary);
+    }
+
+    .step-content-desc {
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .solution-visual {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 24px;
+      position: relative;
+    }
+
+    .solution-visual::before {
+      content: 'CORE_ALGORITHM.SYS';
+      position: absolute;
+      top: -8px;
+      left: 16px;
+      background: var(--bg-base);
+      padding: 0 8px;
+      font-family: var(--font-display);
+      font-size: 9px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    .algo-display {
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.8;
+      color: var(--text-muted);
+    }
+
+    .algo-line {
+      display: flex;
+      gap: 8px;
+    }
+
+    .algo-key {
+      color: #00e5ff;
+    }
+
+    .algo-val {
+      color: var(--green);
+    }
+
+    .algo-comment {
+      color: var(--text-dim);
+    }
+
+    .algo-highlight {
+      color: var(--amber);
+    }
+
+    /* FEATURES */
+    .feature-strip {
+      padding: 80px 40px;
+      border-top: 1px solid var(--border);
+      background: rgba(38, 46, 63, 0.01);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .feature-item {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 24px 20px;
+      text-align: center;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .feature-item::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      right: -1px;
+      width: 6px;
+      height: 6px;
+      border-color: var(--border);
+      border-style: solid;
+      border-width: 1px 1px 0 0;
+    }
+
+    .feature-item:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.08);
+    }
+
+    .feature-icon {
+      font-size: 22px;
+      margin-bottom: 12px;
+      color: var(--cyan);
+    }
+
+    .feature-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .feature-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* CTA */
+    .cta-section {
+      padding: 80px 40px;
+      text-align: center;
+    }
+
+    .cta-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 48px 32px;
+      position: relative;
+    }
+
+    .cta-box::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border: 1px solid var(--cyan);
+      opacity: 0.15;
+      pointer-events: none;
+    }
+
+    .cta-title {
+      font-family: var(--font-display);
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }
+
+    .cta-desc {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 32px;
+    }
+
+    .cta-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* COMPARISON PAGE */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .compare-col-header {
+      border-radius: 0;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .compare-fixed-header {
+      background: rgba(255, 23, 68, 0.03);
+      border: 1px solid var(--red);
+    }
+
+    .compare-ai-header {
+      background: rgba(0, 229, 255, 0.03);
+      border: 1px solid var(--cyan);
+    }
+
+    .compare-col-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-primary);
+    }
+
+    .compare-col-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .compare-badge {
+      padding: 3px 10px;
+      border-radius: 0;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-family: var(--font-display);
+    }
+
+    .badge-fixed {
+      background: var(--red-dim);
+      color: var(--red);
+      border: 1px solid var(--red);
+    }
+
+    .badge-ai {
+      background: var(--green-dim);
+      color: var(--green);
+      border: 1px solid var(--green);
+    }
+
+    .mini-canvas-wrap {
+      background: #0c0e12;
+      border-radius: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .mini-canvas {
+      display: block;
+      width: 100%;
+    }
+
+    /* Big counters */
+    .vehicles-passed-display {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .vpd-card {
+      border-radius: 0;
+      padding: 24px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+    }
+
+    .vpd-fixed {
+      border-color: var(--red);
+    }
+
+    .vpd-ai {
+      border-color: var(--cyan);
+    }
+
+    .vpd-label {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .vpd-number {
+      font-size: 48px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      line-height: 1;
+    }
+
+    .vpd-fixed .vpd-number {
+      color: var(--red);
+    }
+
+    .vpd-ai .vpd-number {
+      color: var(--cyan);
+    }
+
+    .vpd-sublabel {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-family: var(--font-display);
+      letter-spacing: 0.5px;
+    }
+
+    /* Bar race */
+    .bar-race-section {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .bar-race-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .bar-race-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 60px;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .bar-race-label {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .bar-race-track {
+      height: 20px;
+      background: #1a1d24;
+      border-radius: 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-race-fill {
+      height: 100%;
+      border-radius: 0;
+      transition: width 0.8s ease-out;
+      display: flex;
+      align-items: center;
+      padding-left: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #000;
+      min-width: 4px;
+    }
+
+    .bar-fixed-fill {
+      background: var(--red);
+    }
+
+    .bar-ai-fill {
+      background: var(--cyan);
+    }
+
+    .bar-race-val {
+      font-size: 13px;
+      font-weight: 700;
+      font-family: var(--mono);
+      text-align: right;
+    }
+
+    .bar-fixed-val {
+      color: var(--red);
+    }
+
+    .bar-ai-val {
+      color: var(--cyan);
+    }
+
+    /* Progress */
+    .sim-progress-wrap {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+
+    .sim-progress-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .sim-progress-title {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+    }
+
+    .sim-progress-time {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-family: var(--mono);
+    }
+
+    .progress-track {
+      height: 4px;
+      background: #1a1d24;
+      border-radius: 0;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 0;
+      background: var(--cyan);
+      transition: width 0.3s ease;
+    }
+
+    /* Winner */
+    .winner-banner {
+      display: none;
+      padding: 16px;
+      border-radius: 0;
+      margin-bottom: 20px;
+      text-align: center;
+      animation: fade-up 0.4s ease both;
+    }
+
+    .winner-banner.visible {
+      display: block;
+      border: 1px solid var(--border);
+    }
+
+    .winner-banner h2 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
+    .winner-pct {
+      font-size: 32px;
+      font-weight: 700;
+      font-family: var(--font-display);
+    }
+
+    /* Timer panels in compare */
+    .compare-timers {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .compare-timer-card {
+      border-radius: 0;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+    }
+
+    .compare-timer-fixed {
+      border-color: var(--red-dim);
+      background: rgba(255, 23, 68, 0.02);
+    }
+
+    .compare-timer-ai {
+      border-color: var(--green-dim);
+      background: rgba(0, 230, 118, 0.02);
+    }
+
+    .ct-ring {
+      transform: rotate(-90deg);
+    }
+
+    .ct-ring-bg {
+      fill: none;
+      stroke: #1a1d24;
+      stroke-width: 3;
+    }
+
+    .ct-ring-fill {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: square;
+      transition: stroke-dashoffset 0.9s ease;
+    }
+
+    .ct-label {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .ct-lane {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      margin-top: 2px;
+      text-transform: uppercase;
+    }
+
+    /* RESPONSIVE */
+    @media(max-width:900px) {
+
+      .yolo-grid,
+      .sim-grid,
+      .compare-grid,
+      .compare-timers,
+      .vehicles-passed-display,
+      .solution-grid {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        padding: 0 16px;
+      }
+
+      .section {
+        padding: 16px;
+      }
+
+      .problem-section,
+      .solution-section,
+      .feature-strip,
+      .cta-section {
+        padding: 60px 20px;
+      }
+
+      .hero {
+        padding: 60px 20px;
+      }
+
+      .tabs .tab-btn {
+        padding: 7px 10px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo" onclick="switchTab('landing')">
+      <div class="logo-icon">🚦</div>
+      <div>FlowMind AI<span>Smart Traffic System</span></div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-landing" onclick="switchTab('landing')">🏠 Home</button>
+      <button class="tab-btn" id="tab-compare" onclick="switchTab('compare')">⚖️ Compare</button>
+      <button class="tab-btn" id="tab-sim" onclick="switchTab('sim')">
+        <div class="status-dot" id="sim-dot"></div>Simulation
+      </button>
+      <button class="tab-btn" id="tab-yolo" onclick="switchTab('yolo')">
+        <div class="status-dot" id="yolo-dot" style="background:var(--amber)"></div>YOLO Analysis
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- LANDING PAGE                                                  -->
+  <!-- ============================================================ -->
+  <section class="section landing-page active" id="sec-landing">
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-bg-orb orb-1"></div>
+      <div class="hero-bg-orb orb-2"></div>
+      <div class="hero-badge">
+        <div class="status-dot"></div>Live AI System &middot; YOLOv8 + Dynamic Signal Control
+      </div>
+      <h1 class="hero-title">Stop Wasting Time<br /><span class="grad">at Red Lights.</span></h1>
+      <p class="hero-sub">Urban traffic signals haven't changed in 60&nbsp;years — they're still fixed timers. FlowMind
+        AI reads real traffic density and allocates green time dynamically, clearing more vehicles in every cycle.</p>
+      <div class="hero-actions">
+        <button class="btn-hero-primary" onclick="switchTab('compare')">⚖️ See the Comparison</button>
+        <button class="btn-hero-secondary" onclick="switchTab('sim')">🗺️ Live Simulation</button>
+      </div>
+      <div class="hero-stats">
+        <div style="text-align:center">
+          <div class="hero-stat-val">40%</div>
+          <div class="hero-stat-label">More Vehicles Cleared</div>
+        </div>
+        <div style="text-align:center">
+          <div class="hero-stat-val">60s</div>
+          <div class="hero-stat-label">Proof Window</div>
+        </div>
+        <div style="text-align:center">
+          <div class="hero-stat-val">4</div>
+          <div class="hero-stat-label">Lanes Managed</div>
+        </div>
+        <div style="text-align:center">
+          <div class="hero-stat-val">0</div>
+          <div class="hero-stat-label">Wasted Green Seconds</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROBLEM -->
+    <div class="problem-section">
+      <div class="container">
+        <div class="section-eyebrow">⚠ The Problem</div>
+        <h2 class="section-heading">Fixed Timers<br />Cause Real Harm</h2>
+        <p class="section-desc">Every city runs signals on a fixed clock — 30&nbsp;seconds per lane, regardless of
+          actual traffic. The result is predictable: empty lanes get green time while packed lanes idle.</p>
+        <div class="problem-grid">
+          <div class="problem-card">
+            <div class="problem-icon">⏱️</div>
+            <div class="problem-title">Wasted Green Time</div>
+            <div class="problem-desc">Lanes with 0 vehicles still hold a full green phase while adjacent queues grow
+              unchecked every single cycle.</div>
+            <div class="problem-metric">
+              <div class="problem-metric-val">30s</div>
+              <div class="problem-metric-label">given to empty lanes</div>
+            </div>
+          </div>
+          <div class="problem-card">
+            <div class="problem-icon">🚗</div>
+            <div class="problem-title">Queue Overflow</div>
+            <div class="problem-desc">Heavy lanes that receive identical time as light lanes accumulate vehicles across
+              every missed cycle.</div>
+            <div class="problem-metric">
+              <div class="problem-metric-val">2×</div>
+              <div class="problem-metric-label">backlog per missed cycle</div>
+            </div>
+          </div>
+          <div class="problem-card">
+            <div class="problem-icon">💨</div>
+            <div class="problem-title">Unnecessary Emissions</div>
+            <div class="problem-desc">Idling vehicles burn fuel with zero progress. Congested intersections are major
+              city emission hotspots.</div>
+            <div class="problem-metric">
+              <div class="problem-metric-val">23%</div>
+              <div class="problem-metric-label">urban CO₂ from idling</div>
+            </div>
+          </div>
+          <div class="problem-card">
+            <div class="problem-icon">🚑</div>
+            <div class="problem-title">Emergency Delays</div>
+            <div class="problem-desc">Fixed cycles cannot react to emergency vehicles. Every second matters when lives
+              are at stake.</div>
+            <div class="problem-metric">
+              <div class="problem-metric-val">+4.6min</div>
+              <div class="problem-metric-label">avg EMS delay in congestion</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOLUTION -->
+    <div class="solution-section">
+      <div class="container">
+        <div class="solution-grid">
+          <div>
+            <div class="section-eyebrow" style="color:var(--green)">✓ Our Solution</div>
+            <h2 class="section-heading">Dynamic Signals,<br /><span
+                style="background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Driven
+                by Data</span></h2>
+            <p class="section-desc">FlowMind replaces fixed clocks with a weight-based algorithm. Every second, the
+              system measures real vehicle density per lane and assigns green time proportionally.</p>
+            <div class="solution-steps">
+              <div class="solution-step">
+                <div class="step-num">1</div>
+                <div>
+                  <div class="step-content-title">YOLOv8 Vehicle Detection</div>
+                  <div class="step-content-desc">Live camera feeds processed by YOLOv8 count cars, trucks, and buses in
+                    real-time with class-weighted scoring.</div>
+                </div>
+              </div>
+              <div class="solution-step">
+                <div class="step-num">2</div>
+                <div>
+                  <div class="step-content-title">Weight Calculation</div>
+                  <div class="step-content-desc">W = Cars×1 + Trucks×1.5 + Buses×2.5. Heavier vehicles earn priority.
+                    The heaviest lane gets green first.</div>
+                </div>
+              </div>
+              <div class="solution-step">
+                <div class="step-num">3</div>
+                <div>
+                  <div class="step-content-title">Adaptive Green Duration</div>
+                  <div class="step-content-desc">Green time = clamp(6, 18, Weight × 1.2). Dense lanes get up to 3× more
+                    clearance time than sparse ones.</div>
+                </div>
+              </div>
+              <div class="solution-step">
+                <div class="step-num">4</div>
+                <div>
+                  <div class="step-content-title">Emergency Corridor Override</div>
+                  <div class="step-content-desc">When an emergency vehicle is detected, all lanes instantly red and the
+                    corridor opens within one tick.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="solution-visual">
+            <div class="algo-display">
+              <div class="algo-line"><span class="algo-key">function</span> <span
+                  class="algo-highlight">computeWeight</span>(lane) {</div>
+              <div class="algo-line">&nbsp; <span class="algo-key">return</span></div>
+              <div class="algo-line">&nbsp;&nbsp;&nbsp; lane.cars &nbsp;&nbsp;&#215; <span class="algo-val">1.0</span>
+                <span class="algo-comment">// standard car</span>
+              </div>
+              <div class="algo-line">&nbsp;&nbsp;+ lane.trucks &#215; <span class="algo-val">1.5</span> <span
+                  class="algo-comment">// large vehicle</span></div>
+              <div class="algo-line">&nbsp;&nbsp;+ lane.buses &nbsp;&#215; <span class="algo-val">2.5</span>; <span
+                  class="algo-comment">// max weight</span></div>
+              <div class="algo-line">}</div>
+              <div class="algo-line">&nbsp;</div>
+              <div class="algo-line"><span class="algo-key">function</span> <span
+                  class="algo-highlight">greenDuration</span>(weight) {</div>
+              <div class="algo-line">&nbsp; <span class="algo-key">return</span> clamp(</div>
+              <div class="algo-line">&nbsp;&nbsp;&nbsp; <span
+                  class="algo-val">6</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span
+                  class="algo-comment">// min 6s</span></div>
+              <div class="algo-line">&nbsp;&nbsp;&nbsp; <span
+                  class="algo-val">18</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="algo-comment">// max
+                  18s</span></div>
+              <div class="algo-line">&nbsp;&nbsp;&nbsp; weight &#215; <span class="algo-val">1.2</span> <span
+                  class="algo-comment">// adaptive</span></div>
+              <div class="algo-line">&nbsp; );</div>
+              <div class="algo-line">}</div>
+              <div class="algo-line">&nbsp;</div>
+              <div class="algo-line"><span class="algo-comment">// Next = heaviest queue lane</span></div>
+              <div class="algo-line"><span class="algo-key">next</span> = max(weights, <span
+                  class="algo-highlight">byWeight</span>);</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="feature-strip">
+      <div class="container">
+        <div style="text-align:center;margin-bottom:48px;">
+          <div class="section-eyebrow" style="color:var(--blue)">What's inside</div>
+          <h2 class="section-heading">Full-Stack Intelligence</h2>
+        </div>
+        <div class="feature-grid">
+          <div class="feature-item">
+            <div class="feature-icon">👁️</div>
+            <div class="feature-title">YOLOv8 Vision</div>
+            <div class="feature-desc">Real-time object detection on live MJPEG streams with vehicle class recognition
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">⚖️</div>
+            <div class="feature-title">Weight Algorithm</div>
+            <div class="feature-desc">Class-weighted scoring prioritises heavy vehicles that block more road capacity
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🔄</div>
+            <div class="feature-title">Live Comparison</div>
+            <div class="feature-desc">Side-by-side proof: AI dynamic vs fixed 30s timing on identical traffic loads
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🚨</div>
+            <div class="feature-title">Emergency Override</div>
+            <div class="feature-desc">Instant green corridor for ambulances and fire engines, bypassing all queues</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">📡</div>
+            <div class="feature-title">WebSocket Streaming</div>
+            <div class="feature-desc">Flask-SocketIO pushes state every second for zero-latency live dashboard updates
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🗺️</div>
+            <div class="feature-title">Canvas Visualisation</div>
+            <div class="feature-desc">60 FPS animated intersection with vehicle sprites and real-time traffic light
+              state</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-section">
+      <div class="container">
+        <div class="cta-box">
+          <div class="cta-title">Ready to see the<br /><span
+              style="background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">proof
+              in 60&nbsp;seconds?</span></div>
+          <p class="cta-desc">Run the live comparison and watch AI dynamic timing outperform fixed signals on identical
+            traffic loads.</p>
+          <div class="cta-actions">
+            <button class="btn-hero-primary" onclick="switchTab('compare')">⚖️ Run Comparison Now</button>
+            <button class="btn-hero-secondary" onclick="switchTab('yolo')">📹 YOLO Analysis</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- COMPARISON PAGE                                               -->
+  <!-- ============================================================ -->
+  <section class="section" id="sec-compare">
+    <h1 class="section-title">Fixed vs. AI Signal Timing <span class="section-badge">60-Second Proof</span></h1>
+
+    <!-- Explainer -->
+    <div
+      style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:24px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="font-weight:700;margin-bottom:4px;">Same traffic load. Same 60-second window. Different signal
+          rules.</div>
+        <div style="color:var(--text-muted);font-size:13px;">Both simulations start with identical random vehicle counts
+          seeded from the same value. Watch vehicles-passed diverge in real time.</div>
+      </div>
+      <button class="btn btn-primary" id="compare-start-btn" onclick="startComparison()"
+        style="flex-shrink:0;padding:12px 28px;font-size:14px;">▶ Start Comparison</button>
+      <button class="btn btn-secondary" id="compare-reset-btn" onclick="resetComparison()" style="flex-shrink:0;">↺
+        Reset</button>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="sim-progress-wrap">
+      <div class="sim-progress-header">
+        <div class="sim-progress-title">📊 Simulation Progress</div>
+        <div class="sim-progress-time" id="compare-time-remaining">00:60</div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="compare-progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Winner banner -->
+    <div class="winner-banner" id="winner-banner">
+      <h2 id="winner-title">🏆 AI Dynamic Timing Wins!</h2>
+      <div class="winner-pct" id="winner-pct">+0%</div>
+      <p id="winner-desc" style="color:var(--text-muted);font-size:14px;margin-top:6px;">more vehicles cleared compared
+        to fixed 30-second timing</p>
+    </div>
+
+    <!-- Big vehicle counters -->
+    <div class="vehicles-passed-display">
+      <div class="vpd-card vpd-fixed">
+        <div class="vpd-label">🔴 Fixed 30s Timer</div>
+        <div class="vpd-number" id="vpd-fixed">0</div>
+        <div class="vpd-sublabel">vehicles passed</div>
+      </div>
+      <div class="vpd-card vpd-ai">
+        <div class="vpd-label">🟢 AI Dynamic Timer</div>
+        <div class="vpd-number" id="vpd-ai">0</div>
+        <div class="vpd-sublabel">vehicles passed</div>
+      </div>
+    </div>
+
+    <!-- Bar race -->
+    <div class="bar-race-section">
+      <div class="bar-race-title">📈 Vehicles Passed — Live Race Chart</div>
+      <div class="bar-race-row">
+        <div class="bar-race-label">Fixed 30s</div>
+        <div class="bar-race-track">
+          <div class="bar-race-fill bar-fixed-fill" id="bar-fixed" style="width:0%"></div>
+        </div>
+        <div class="bar-race-val bar-fixed-val" id="bar-fixed-val">0</div>
+      </div>
+      <div class="bar-race-row">
+        <div class="bar-race-label">AI Dynamic</div>
+        <div class="bar-race-track">
+          <div class="bar-race-fill bar-ai-fill" id="bar-ai" style="width:0%"></div>
+        </div>
+        <div class="bar-race-val bar-ai-val" id="bar-ai-val">0</div>
+      </div>
+      <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:20px;">
+        <div
+          style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-dim);margin-bottom:14px;">
+          Vehicles in Queue per Lane</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div id="lane-breakdown-fixed"></div>
+          <div id="lane-breakdown-ai"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timer panels -->
+    <div class="compare-timers">
+      <div class="compare-timer-card compare-timer-fixed">
+        <div style="position:relative;flex-shrink:0;">
+          <svg width="64" height="64" class="ct-ring">
+            <circle class="ct-ring-bg" cx="32" cy="32" r="26" />
+            <circle class="ct-ring-fill" cx="32" cy="32" r="26" id="ct-ring-fixed" stroke="var(--red)"
+              stroke-dasharray="163.4" stroke-dashoffset="0" />
+          </svg>
+          <div
+            style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;font-family:var(--mono);color:var(--red)"
+            id="ct-val-fixed">—</div>
+        </div>
+        <div>
+          <div class="ct-label">Fixed 30s — Active Lane</div>
+          <div class="ct-lane" id="ct-lane-fixed">—</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">30 sec each · round-robin</div>
+        </div>
+      </div>
+      <div class="compare-timer-card compare-timer-ai">
+        <div style="position:relative;flex-shrink:0;">
+          <svg width="64" height="64" class="ct-ring">
+            <circle class="ct-ring-bg" cx="32" cy="32" r="26" />
+            <circle class="ct-ring-fill" cx="32" cy="32" r="26" id="ct-ring-ai" stroke="var(--green)"
+              stroke-dasharray="163.4" stroke-dashoffset="0" />
+          </svg>
+          <div
+            style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;font-family:var(--mono);color:var(--green)"
+            id="ct-val-ai">—</div>
+        </div>
+        <div>
+          <div class="ct-label">AI Dynamic — Active Lane</div>
+          <div class="ct-lane" id="ct-lane-ai">—</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">6–18 sec · weight-based</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Side-by-side canvases -->
+    <div class="compare-grid">
+      <div>
+        <div class="compare-col-header compare-fixed-header">
+          <div>
+            <div class="compare-col-title">🔴 Fixed 30s Timer</div>
+            <div class="compare-col-subtitle">Traditional round-robin · Every lane gets exactly 30 seconds</div>
+          </div>
+          <div class="compare-badge badge-fixed">FIXED</div>
+        </div>
+        <div class="card">
+          <div class="card-body" style="padding:12px;">
+            <div class="mini-canvas-wrap"><canvas id="cmp-canvas-fixed" class="mini-canvas" width="480"
+                height="300"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="compare-col-header compare-ai-header">
+          <div>
+            <div class="compare-col-title">🟢 AI Dynamic Timer</div>
+            <div class="compare-col-subtitle">Weight-based priority · Heaviest lane gets green first</div>
+          </div>
+          <div class="compare-badge badge-ai">AI</div>
+        </div>
+        <div class="card">
+          <div class="card-body" style="padding:12px;">
+            <div class="mini-canvas-wrap"><canvas id="cmp-canvas-ai" class="mini-canvas" width="480"
+                height="300"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SIMULATION PAGE                                               -->
+  <!-- ============================================================ -->
+  <section class="section" id="sec-sim">
+    <h1 class="section-title">4-Way Intersection Simulation <span class="section-badge">Live</span></h1>
+    <div id="sim-emergency-banner" class="emergency-banner"><span class="emerg-icon">🚨</span>EMERGENCY CORRIDOR ACTIVE
+      — ALL NON-PRIORITY LANES HALTED</div>
+    <div class="sim-grid">
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🗺️ Intersection Map</div><span style="font-size:12px;color:var(--text-muted);"
+              id="sim-fps">60 FPS</span>
+          </div>
+          <div class="card-body" style="padding:12px;">
+            <div class="canvas-wrap"><canvas id="sim-canvas" width="700" height="420"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📈 Statistics</div>
+          </div>
+          <div class="card-body" style="padding:14px;">
+            <div class="stats-row">
+              <div class="stat-mini">
+                <div class="stat-mini-val" id="s-cycles" style="color:var(--cyan)">0</div>
+                <div class="stat-mini-label">Cycles</div>
+              </div>
+              <div class="stat-mini">
+                <div class="stat-mini-val" id="s-vehicles" style="color:var(--green)">0</div>
+                <div class="stat-mini-label">Vehicles</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🟢 Active Signal</div><span id="sim-active-label"
+              style="font-weight:700;color:var(--green);font-size:13px;">—</span>
+          </div>
+          <div class="card-body" style="padding:16px;">
+            <div class="timer-ring-wrap">
+              <svg width="110" height="110" class="timer-ring-svg" id="sim-ring-svg">
+                <circle class="timer-ring-bg" cx="55" cy="55" r="44" />
+                <circle class="timer-ring-fill" cx="55" cy="55" r="44" id="sim-ring-fill" stroke="var(--green)"
+                  stroke-dasharray="276.5" stroke-dashoffset="0" />
+              </svg>
+              <div class="timer-val" id="sim-timer-val">—</div>
+              <div class="timer-label">Seconds Remaining</div>
+            </div>
+            <div style="margin-bottom:8px;">
+              <div
+                style="font-family:var(--font-display);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:6px;">
+                🚨 Emergency Corridor</div>
+              <div class="emerg-grid">
+                <button class="btn-corridor" id="sim-corr-N" onclick="triggerSimCorridor('N')">↓ North</button>
+                <button class="btn-corridor" id="sim-corr-S" onclick="triggerSimCorridor('S')">↑ South</button>
+                <button class="btn-corridor" id="sim-corr-E" onclick="triggerSimCorridor('E')">← East</button>
+                <button class="btn-corridor" id="sim-corr-W" onclick="triggerSimCorridor('W')">→ West</button>
+              </div>
+              <button class="btn btn-cancel-emerg" id="sim-cancel-emerg-btn" onclick="cancelSimEmergency()">✕ Cancel
+                Emergency</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">⚖️ Lane Weights</div><span style="font-size:11px;color:var(--text-muted)">W = C×1 +
+              T×1.5 + B×2.5</span>
+          </div>
+          <div class="card-body" style="padding:14px;">
+            <div class="lane-cards" id="sim-lane-cards">
+              <div class="lane-card" id="sim-card-N">
+                <div class="lane-card-top">
+                  <div class="lane-name">North Lane</div><span class="light-badge red" id="sim-badge-N">RED</span>
+                </div>
+                <div class="vehicle-counts">
+                  <div class="v-count">🚗 <strong id="sim-count-car-N">0</strong> Cars</div>
+                  <div class="v-count">🚛 <strong id="sim-count-truck-N">0</strong> Trucks</div>
+                  <div class="v-count">🚌 <strong id="sim-count-bus-N">0</strong> Buses</div>
+                </div>
+                <div class="weight-bar-wrap">
+                  <div class="weight-label"><span>Weight</span><span id="sim-weight-label-N">0.0 → 6s</span></div>
+                  <div class="weight-bar-bg">
+                    <div class="weight-bar-fill red-fill" id="sim-bar-fill-N" style="width:0%"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="lane-card" id="sim-card-S">
+                <div class="lane-card-top">
+                  <div class="lane-name">South Lane</div><span class="light-badge red" id="sim-badge-S">RED</span>
+                </div>
+                <div class="vehicle-counts">
+                  <div class="v-count">🚗 <strong id="sim-count-car-S">0</strong> Cars</div>
+                  <div class="v-count">🚛 <strong id="sim-count-truck-S">0</strong> Trucks</div>
+                  <div class="v-count">🚌 <strong id="sim-count-bus-S">0</strong> Buses</div>
+                </div>
+                <div class="weight-bar-wrap">
+                  <div class="weight-label"><span>Weight</span><span id="sim-weight-label-S">0.0 → 6s</span></div>
+                  <div class="weight-bar-bg">
+                    <div class="weight-bar-fill red-fill" id="sim-bar-fill-S" style="width:0%"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="lane-card" id="sim-card-E">
+                <div class="lane-card-top">
+                  <div class="lane-name">East Lane</div><span class="light-badge red" id="sim-badge-E">RED</span>
+                </div>
+                <div class="vehicle-counts">
+                  <div class="v-count">🚗 <strong id="sim-count-car-E">0</strong> Cars</div>
+                  <div class="v-count">🚛 <strong id="sim-count-truck-E">0</strong> Trucks</div>
+                  <div class="v-count">🚌 <strong id="sim-count-bus-E">0</strong> Buses</div>
+                </div>
+                <div class="weight-bar-wrap">
+                  <div class="weight-label"><span>Weight</span><span id="sim-weight-label-E">0.0 → 6s</span></div>
+                  <div class="weight-bar-bg">
+                    <div class="weight-bar-fill red-fill" id="sim-bar-fill-E" style="width:0%"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="lane-card" id="sim-card-W">
+                <div class="lane-card-top">
+                  <div class="lane-name">West Lane</div><span class="light-badge red" id="sim-badge-W">RED</span>
+                </div>
+                <div class="vehicle-counts">
+                  <div class="v-count">🚗 <strong id="sim-count-car-W">0</strong> Cars</div>
+                  <div class="v-count">🚛 <strong id="sim-count-truck-W">0</strong> Trucks</div>
+                  <div class="v-count">🚌 <strong id="sim-count-bus-W">0</strong> Buses</div>
+                </div>
+                <div class="weight-bar-wrap">
+                  <div class="weight-label"><span>Weight</span><span id="sim-weight-label-W">0.0 → 6s</span></div>
+                  <div class="weight-bar-bg">
+                    <div class="weight-bar-fill red-fill" id="sim-bar-fill-W" style="width:0%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- VEHICLE COLOR KEY -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🎨 Vehicle Key</div>
+          </div>
+          <div class="card-body" style="padding:14px;">
+            <div class="color-key">
+              <div class="color-key-row">
+                <div class="color-swatch" style="background:#3b9eff;"></div>Car (Blue)
+              </div>
+              <div class="color-key-row">
+                <div class="color-swatch" style="background:#b06bff;"></div>Car (Purple)
+              </div>
+              <div class="color-key-row">
+                <div class="color-swatch" style="background:#ffb830;"></div>Car (Amber)
+              </div>
+              <div class="color-key-row">
+                <div class="color-swatch" style="background:#ff6b9d;"></div>Car (Pink)
+              </div>
+              <div class="color-key-row">
+                <div class="color-swatch" style="background:#ff8c42;"></div>Truck (Orange)
+              </div>
+              <div class="color-key-row">
+                <div class="color-swatch" style="background:#00e5ff;"></div>Bus (Cyan)
+              </div>
+              <div class="color-key-row">
+                <div class="color-swatch" style="background:#a8ff3e;"></div>Motorcycle (Lime)
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- YOLO PAGE                                                     -->
+  <!-- ============================================================ -->
+  <section class="section" id="sec-yolo">
+    <h1 class="section-title">YOLOv8 Live Traffic Analysis <span class="section-badge">Real-time</span></h1>
+    <div id="yolo-emergency-banner" class="emergency-banner"><span class="emerg-icon">🚨</span>EMERGENCY VEHICLE
+      DETECTED — GREEN CORRIDOR ACTIVE</div>
+    <div class="yolo-grid">
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📹 Live Video Feed</div>
+            <div style="display:flex;gap:8px;align-items:center;"><span
+                style="font-size:11px;color:var(--text-muted)">Lanes:</span>
+              <div class="quad-selector">
+                <button class="quad-btn active-q" id="q2" onclick="setQuads(2)">2</button>
+                <button class="quad-btn" id="q3" onclick="setQuads(3)">3</button>
+                <button class="quad-btn" id="q4" onclick="setQuads(4)">4</button>
+              </div>
+            </div>
+          </div>
+          <div class="card-body" style="padding:16px;">
+            <div class="video-wrapper"><img id="yolo-feed" src="/video_feed" alt="YOLO Feed"
+                style="display:block;width:100%;border-radius:8px;" /></div>
+            <div class="video-controls" style="margin-top:14px;">
+              <button class="btn btn-secondary" onclick="useSampleAll()" style="font-size:12px;">🎬 Sample All
+                Lanes</button>
+              <button class="btn btn-secondary" onclick="clearAllLanes()" style="font-size:12px;">❌ Clear All</button>
+              <span style="font-size:12px;color:var(--text-muted);margin-left:auto;" id="yolo-frame-counter">Frame:
+                0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🟢 Active Signal</div><span id="yolo-active-label"
+              style="font-weight:700;color:var(--green);font-size:13px;">—</span>
+          </div>
+          <div class="card-body" style="padding:16px;">
+            <div class="timer-ring-wrap">
+              <svg width="100" height="100" class="timer-ring-svg">
+                <circle class="timer-ring-bg" cx="50" cy="50" r="40" />
+                <circle class="timer-ring-fill" cx="50" cy="50" r="40" id="yolo-ring-fill" stroke="var(--green)"
+                  stroke-dasharray="251.2" stroke-dashoffset="0" />
+              </svg>
+              <div class="timer-val" id="yolo-timer-val">—</div>
+              <div class="timer-label">Seconds Remaining</div>
+            </div>
+            <button class="btn btn-emergency" id="yolo-emerg-btn" onclick="triggerYoloEmergency()">🚨 TRIGGER EMERGENCY
+              CORRIDOR</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📊 Lane Analysis</div>
+          </div>
+          <div class="card-body" style="padding:12px;">
+            <div class="lane-cards" id="yolo-lane-cards">
+              <!-- Lane 0 -->
+              <div class="lane-card" id="yolo-card-0">
+                <div class="lane-card-top">
+                  <div class="lane-name">Lane 1 (North)</div><span class="light-badge red" id="yolo-badge-0">RED</span>
+                </div>
+                <div class="vehicle-counts">
+                  <div class="v-count">🚗 <strong id="yolo-count-car-0">0</strong></div>
+                  <div class="v-count">🚛 <strong id="yolo-count-truck-0">0</strong></div>
+                  <div class="v-count">🚌 <strong id="yolo-count-bus-0">0</strong></div>
+                  <div class="v-count">🏍️ <strong id="yolo-count-motorcycle-0">0</strong></div>
+                </div>
+                <div class="weight-bar-wrap">
+                  <div class="weight-label"><span>Weight</span><span id="yolo-weight-label-0">0.0 → 6s</span></div>
+                  <div class="weight-bar-bg">
+                    <div class="weight-bar-fill red-fill" id="yolo-bar-fill-0" style="width:0%"></div>
+                  </div>
+                </div>
+                <div style="margin-top:10px;display:flex;gap:6px;"><label class="btn btn-secondary btn-upload"
+                    style="font-size:11px;padding:4px 8px;flex:1;text-align:center;justify-content:center;">📁
+                    Upload<input type="file" accept="video/*" onchange="uploadLaneVideo(0,this)" /></label><button
+                    class="btn btn-secondary" onclick="useLaneSample(0)"
+                    style="font-size:11px;padding:4px 8px;flex:1;justify-content:center;">🎬 Sample</button><button
+                    class="btn btn-secondary" onclick="clearLaneVideo(0)"
+                    style="font-size:11px;padding:4px 8px;flex-shrink:0;">❌</button></div>
+                <div id="yolo-emerg-label-0"
+                  style="display:none;color:var(--red);font-size:11px;margin-top:6px;font-weight:700;">🚨 Emergency
+                  Vehicle</div>
+              </div>
+              <!-- Lane 1 -->
+              <div class="lane-card" id="yolo-card-1">
+                <div class="lane-card-top">
+                  <div class="lane-name">Lane 2 (East)</div><span class="light-badge red" id="yolo-badge-1">RED</span>
+                </div>
+                <div class="vehicle-counts">
+                  <div class="v-count">🚗 <strong id="yolo-count-car-1">0</strong></div>
+                  <div class="v-count">🚛 <strong id="yolo-count-truck-1">0</strong></div>
+                  <div class="v-count">🚌 <strong id="yolo-count-bus-1">0</strong></div>
+                  <div class="v-count">🏍️ <strong id="yolo-count-motorcycle-1">0</strong></div>
+                </div>
+                <div class="weight-bar-wrap">
+                  <div class="weight-label"><span>Weight</span><span id="yolo-weight-label-1">0.0 → 6s</span></div>
+                  <div class="weight-bar-bg">
+                    <div class="weight-bar-fill red-fill" id="yolo-bar-fill-1" style="width:0%"></div>
+                  </div>
+                </div>
+                <div style="margin-top:10px;display:flex;gap:6px;"><label class="btn btn-secondary btn-upload"
+                    style="font-size:11px;padding:4px 8px;flex:1;text-align:center;justify-content:center;">📁
+                    Upload<input type="file" accept="video/*" onchange="uploadLaneVideo(1,this)" /></label><button
+                    class="btn btn-secondary" onclick="useLaneSample(1)"
+                    style="font-size:11px;padding:4px 8px;flex:1;justify-content:center;">🎬 Sample</button><button
+                    class="btn btn-secondary" onclick="clearLaneVideo(1)"
+                    style="font-size:11px;padding:4px 8px;flex-shrink:0;">❌</button></div>
+                <div id="yolo-emerg-label-1"
+                  style="display:none;color:var(--red);font-size:11px;margin-top:6px;font-weight:700;">🚨 Emergency
+                  Vehicle</div>
+              </div>
+              <!-- Lane 2 -->
+              <div class="lane-card" id="yolo-card-2">
+                <div class="lane-card-top">
+                  <div class="lane-name">Lane 3 (South)</div><span class="light-badge red" id="yolo-badge-2">RED</span>
+                </div>
+                <div class="vehicle-counts">
+                  <div class="v-count">🚗 <strong id="yolo-count-car-2">0</strong></div>
+                  <div class="v-count">🚛 <strong id="yolo-count-truck-2">0</strong></div>
+                  <div class="v-count">🚌 <strong id="yolo-count-bus-2">0</strong></div>
+                  <div class="v-count">🏍️ <strong id="yolo-count-motorcycle-2">0</strong></div>
+                </div>
+                <div class="weight-bar-wrap">
+                  <div class="weight-label"><span>Weight</span><span id="yolo-weight-label-2">0.0 → 6s</span></div>
+                  <div class="weight-bar-bg">
+                    <div class="weight-bar-fill red-fill" id="yolo-bar-fill-2" style="width:0%"></div>
+                  </div>
+                </div>
+                <div style="margin-top:10px;display:flex;gap:6px;"><label class="btn btn-secondary btn-upload"
+                    style="font-size:11px;padding:4px 8px;flex:1;text-align:center;justify-content:center;">📁
+                    Upload<input type="file" accept="video/*" onchange="uploadLaneVideo(2,this)" /></label><button
+                    class="btn btn-secondary" onclick="useLaneSample(2)"
+                    style="font-size:11px;padding:4px 8px;flex:1;justify-content:center;">🎬 Sample</button><button
+                    class="btn btn-secondary" onclick="clearLaneVideo(2)"
+                    style="font-size:11px;padding:4px 8px;flex-shrink:0;">❌</button></div>
+                <div id="yolo-emerg-label-2"
+                  style="display:none;color:var(--red);font-size:11px;margin-top:6px;font-weight:700;">🚨 Emergency
+                  Vehicle</div>
+              </div>
+              <!-- Lane 3 -->
+              <div class="lane-card" id="yolo-card-3">
+                <div class="lane-card-top">
+                  <div class="lane-name">Lane 4 (West)</div><span class="light-badge red" id="yolo-badge-3">RED</span>
+                </div>
+                <div class="vehicle-counts">
+                  <div class="v-count">🚗 <strong id="yolo-count-car-3">0</strong></div>
+                  <div class="v-count">🚛 <strong id="yolo-count-truck-3">0</strong></div>
+                  <div class="v-count">🚌 <strong id="yolo-count-bus-3">0</strong></div>
+                  <div class="v-count">🏍️ <strong id="yolo-count-motorcycle-3">0</strong></div>
+                </div>
+                <div class="weight-bar-wrap">
+                  <div class="weight-label"><span>Weight</span><span id="yolo-weight-label-3">0.0 → 6s</span></div>
+                  <div class="weight-bar-bg">
+                    <div class="weight-bar-fill red-fill" id="yolo-bar-fill-3" style="width:0%"></div>
+                  </div>
+                </div>
+                <div style="margin-top:10px;display:flex;gap:6px;"><label class="btn btn-secondary btn-upload"
+                    style="font-size:11px;padding:4px 8px;flex:1;text-align:center;justify-content:center;">📁
+                    Upload<input type="file" accept="video/*" onchange="uploadLaneVideo(3,this)" /></label><button
+                    class="btn btn-secondary" onclick="useLaneSample(3)"
+                    style="font-size:11px;padding:4px 8px;flex:1;justify-content:center;">🎬 Sample</button><button
+                    class="btn btn-secondary" onclick="clearLaneVideo(3)"
+                    style="font-size:11px;padding:4px 8px;flex-shrink:0;">❌</button></div>
+                <div id="yolo-emerg-label-3"
+                  style="display:none;color:var(--red);font-size:11px;margin-top:6px;font-weight:700;">🚨 Emergency
+                  Vehicle</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- JAVASCRIPT                                                    -->
+  <!-- ============================================================ -->
+  <script>
+    /* ===============================================================
+       TAB SWITCHING
+       =============================================================== */
+    function switchTab(tab) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('sec-' + tab).classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+    }
+
+    /* ===============================================================
+       SOCKET.IO
+       =============================================================== */
+    const socket = io({ transports: ['websocket'], upgrade: false });
+    socket.on('connect', () => { document.getElementById('sim-dot').style.background = 'var(--green)'; });
+    socket.on('disconnect', () => { document.getElementById('sim-dot').style.background = 'var(--red)'; });
+
+    /* ===============================================================
+       SIMULATION STATE (backend)
+       =============================================================== */
+    let simState = null;
+
+    socket.on('sim_state', state => { simState = state; updateSimDashboard(state); });
+
+    function updateSimDashboard(state) {
+      document.getElementById('s-cycles').textContent = state.stats.cycles;
+      document.getElementById('s-vehicles').textContent = state.stats.total_vehicles;
+      const laneNames = { N: 'North', S: 'South', E: 'East', W: 'West' };
+      document.getElementById('sim-active-label').textContent = laneNames[state.active_lane] || state.active_lane;
+      updateRing('sim-ring-fill', 'sim-timer-val', state.timer, 18, state.emergency ? 'var(--red)' : 'var(--green)', 276.5);
+      const eb = document.getElementById('sim-emergency-banner');
+      const cancelBtn = document.getElementById('sim-cancel-emerg-btn');
+      if (state.emergency) {
+        eb.classList.add('visible');
+        if (cancelBtn) cancelBtn.classList.add('visible');
+      } else {
+        eb.classList.remove('visible');
+        if (cancelBtn) cancelBtn.classList.remove('visible');
+        ['N', 'S', 'E', 'W'].forEach(k => {
+          const btn = document.getElementById('sim-corr-' + k);
+          if (btn) btn.classList.remove('active-corridor');
+        });
+      }
+      const maxW = Math.max(...Object.values(state.weights), 1);
+      ['N', 'S', 'E', 'W'].forEach(k => {
+        const l = state.lanes[k]; if (!l) return;
+        const isA = k === state.active_lane, pct = Math.min(100, (l.weight / maxW) * 100);
+        const card = document.getElementById('sim-card-' + k); if (!card) return;
+        card.className = 'lane-card light-' + l.light + (isA ? ' active-lane-card' : '');
+        const badge = document.getElementById('sim-badge-' + k);
+        badge.textContent = l.light.toUpperCase(); badge.className = 'light-badge ' + l.light;
+        document.getElementById('sim-count-car-' + k).textContent = l.cars;
+        document.getElementById('sim-count-truck-' + k).textContent = l.trucks;
+        document.getElementById('sim-count-bus-' + k).textContent = l.buses;
+        document.getElementById('sim-weight-label-' + k).textContent = l.weight + ' → ' + l.green_time + 's';
+        const bar = document.getElementById('sim-bar-fill-' + k);
+        bar.style.width = pct + '%'; bar.className = 'weight-bar-fill ' + (isA ? 'green-fill' : 'red-fill');
+      });
+    }
+
+    /* ===============================================================
+       YOLO STATE
+       =============================================================== */
+    socket.on('yolo_state', state => { updateYoloDashboard(state); document.getElementById('yolo-dot').style.background = 'var(--green)'; });
+
+    function updateYoloDashboard(state) {
+      const aQ = state.active_quad;
+      document.getElementById('yolo-active-label').textContent = state.quads[aQ]?.name || '—';
+      updateRing('yolo-ring-fill', 'yolo-timer-val', state.timer, 60, state.emergency ? 'var(--red)' : 'var(--green)', 251.2);
+      const eb = document.getElementById('yolo-emergency-banner'), eb2 = document.getElementById('yolo-emerg-btn');
+      state.emergency ? (eb.classList.add('visible'), eb2.classList.add('active-emerg')) : (eb.classList.remove('visible'), eb2.classList.remove('active-emerg'));
+      const maxW = Math.max(...state.quads.map(q => q.weight), 1);
+      for (let i = 0; i < 4; i++) {
+        const card = document.getElementById('yolo-card-' + i);
+        if (i < state.n_lanes) {
+          card.style.display = 'block';
+          const q = state.quads[i], isA = i === aQ, pct = Math.min(100, (q.weight / maxW) * 100);
+          card.className = 'lane-card light-' + q.light + (isA ? ' active-lane-card' : '');
+          const badge = document.getElementById('yolo-badge-' + i);
+          badge.textContent = q.light.toUpperCase(); badge.className = 'light-badge ' + q.light;
+          document.getElementById('yolo-count-car-' + i).textContent = q.counts.car || 0;
+          document.getElementById('yolo-count-truck-' + i).textContent = q.counts.truck || 0;
+          document.getElementById('yolo-count-bus-' + i).textContent = q.counts.bus || 0;
+          document.getElementById('yolo-count-motorcycle-' + i).textContent = q.counts.motorcycle || 0;
+          document.getElementById('yolo-weight-label-' + i).textContent = q.weight + ' → ' + q.green_time + 's';
+          const bar = document.getElementById('yolo-bar-fill-' + i);
+          bar.style.width = pct + '%'; bar.className = 'weight-bar-fill ' + (isA ? 'green-fill' : 'red-fill');
+          document.getElementById('yolo-emerg-label-' + i).style.display = q.emergency ? 'block' : 'none';
+        } else { card.style.display = 'none'; }
+      }
+    }
+
+    /* ===============================================================
+       HELPERS
+       =============================================================== */
+    function updateRing(fillId, valId, current, max, color, circ) {
+      const fill = document.getElementById(fillId), val = document.getElementById(valId);
+      const pct = Math.min(1, Math.max(0, current / max));
+      fill.style.strokeDashoffset = circ * (1 - pct); fill.style.stroke = color;
+      val.textContent = current; val.style.color = color;
+    }
+
+    function triggerSimCorridor(lane) {
+      socket.emit('toggle_emergency', { lane: lane });
+      ['N', 'S', 'E', 'W'].forEach(k => {
+        const btn = document.getElementById('sim-corr-' + k);
+        if (btn) btn.classList.toggle('active-corridor', k === lane);
+      });
+      const cancelBtn = document.getElementById('sim-cancel-emerg-btn');
+      if (cancelBtn) { cancelBtn.classList.add('visible'); }
+    }
+    function cancelSimEmergency() {
+      socket.emit('cancel_emergency');
+      ['N', 'S', 'E', 'W'].forEach(k => {
+        const btn = document.getElementById('sim-corr-' + k);
+        if (btn) btn.classList.remove('active-corridor');
+      });
+      const cancelBtn = document.getElementById('sim-cancel-emerg-btn');
+      if (cancelBtn) cancelBtn.classList.remove('visible');
+    }
+    function triggerYoloEmergency() { socket.emit('yolo_emergency_override'); document.getElementById('yolo-emerg-btn').classList.add('active-emerg'); }
+
+    function setQuads(n) {
+      [2, 3, 4].forEach(i => document.getElementById('q' + i).classList.toggle('active-q', i === n));
+      socket.emit('yolo_set_quads', { n }); fetch('/set_quads/' + n);
+    }
+
+    function uploadLaneVideo(i, inp) {
+      if (!inp.files[0]) return;
+      const fd = new FormData(); fd.append('video', inp.files[0]);
+      fetch('/upload_video/' + i, { method: 'POST', body: fd }).then(r => r.json()).then(d => { if (d.status !== 'ok') alert('Upload failed: ' + (d.error || '?')); });
+    }
+    function useLaneSample(i) { fetch('/use_sample/' + i).then(r => r.json()).then(d => { if (d.status !== 'ok') alert('Error: ' + (d.error || '?')); }); }
+    function clearLaneVideo(i) { fetch('/clear_lane/' + i); }
+    function useSampleAll() { fetch('/use_sample_all'); }
+    function clearAllLanes() { for (let i = 0; i < 4; i++) clearLaneVideo(i); }
+
+    /* ===============================================================
+       COMPARISON ENGINE — pure JS (same logic as sim_engine.py)
+       =============================================================== */
+    class SeededRandom {
+      constructor(seed) { this.s = Math.abs(seed) % 2147483647 || 1; }
+      next() { return this.s = this.s * 16807 % 2147483647; }
+      random() { return (this.next() - 1) / 2147483646; }
+      randint(lo, hi) { return lo + Math.floor(this.random() * (hi - lo + 1)); }
+    }
+
+    class JsSimEngine {
+      constructor(mode, seed) {
+        this.mode = mode; this.rng = new SeededRandom(seed);
+        this.lanes = {};
+        for (const l of ['N', 'S', 'E', 'W']) this.lanes[l] = { cars: this.rng.randint(2, 8), trucks: this.rng.randint(0, 3), buses: this.rng.randint(0, 2) };
+        this._recalcWeights();
+        this.activeLane = 'N'; this.timer = this._getTimer('N');
+        this.stats = { vehicles_passed: 0, cycles: 0 };
+      }
+      _wt(l) { const d = this.lanes[l]; return Math.round((d.cars * 1.0 + d.trucks * 1.5 + d.buses * 2.5) * 10) / 10; }
+      _recalcWeights() { this.weights = {}; for (const l of ['N', 'S', 'E', 'W']) this.weights[l] = this._wt(l); }
+      _getTimer(l) { return this.mode === 'fixed' ? 30 : Math.max(6, Math.min(18, Math.round(this.weights[l] * 1.2))); }
+      _nextLane() {
+        if (this.mode === 'fixed') { const idx = ['N', 'S', 'E', 'W'].indexOf(this.activeLane); return ['N', 'S', 'E', 'W'][(idx + 1) % 4]; }
+        return Object.keys(this.weights).reduce((a, b) => this.weights[a] >= this.weights[b] ? a : b);
+      }
+      tick() {
+        for (const lane of ['N', 'S', 'E', 'W']) {
+          if (this.rng.random() < 0.6) { const r = this.rng.random(); const vt = r < 0.7 ? 'cars' : r < 0.9 ? 'trucks' : 'buses'; this.lanes[lane][vt] = Math.min(this.lanes[lane][vt] + this.rng.randint(1, 3), 20); }
+          if (lane === this.activeLane) for (const vt of ['cars', 'trucks', 'buses']) { const dep = this.rng.randint(1, 4), act = Math.min(this.lanes[lane][vt], dep); this.lanes[lane][vt] = Math.max(0, this.lanes[lane][vt] - dep); this.stats.vehicles_passed += act; }
+        }
+        this._recalcWeights();
+        this.timer -= 1;
+        if (this.timer <= 0) { this.activeLane = this._nextLane(); this.timer = this._getTimer(this.activeLane); this.stats.cycles += 1; }
+        return this._state();
+      }
+      _state() {
+        const s = { lanes: {}, active_lane: this.activeLane, timer: this.timer, stats: this.stats, weights: this.weights };
+        for (const l of ['N', 'S', 'E', 'W']) s.lanes[l] = { ...this.lanes[l], weight: this.weights[l], green_time: this._getTimer(l), light: l === this.activeLane ? 'green' : 'red' };
+        return s;
+      }
+    }
+
+    let cmpRunning = false, cmpInterval = null, cmpFixed = null, cmpAI = null, cmpTick = 0;
+    const CMP_MAX = 60;
+    let fixedState = null, aiState = null;
+
+    function startComparison() {
+      if (cmpRunning) return;
+      const seed = Math.floor(Date.now() / 1000);
+      cmpFixed = new JsSimEngine('fixed', seed);
+      cmpAI = new JsSimEngine('dynamic', seed);
+      cmpTick = 0; cmpRunning = true;
+      fixedState = null; aiState = null;
+      for (const k of ['N', 'S', 'E', 'W']) { cmpVehF[k] = []; cmpVehA[k] = []; }
+      document.getElementById('winner-banner').classList.remove('visible');
+      const btn = document.getElementById('compare-start-btn');
+      btn.disabled = true; btn.textContent = '⏳ Running...';
+      cmpInterval = setInterval(runCmpTick, 200);
+    }
+
+    function resetComparison() {
+      clearInterval(cmpInterval); cmpRunning = false; cmpFixed = null; cmpAI = null; cmpTick = 0; fixedState = null; aiState = null;
+      for (const k of ['N', 'S', 'E', 'W']) { cmpVehF[k] = []; cmpVehA[k] = []; }
+      ['vpd-fixed', 'vpd-ai'].forEach(id => document.getElementById(id).textContent = '0');
+      ['bar-fixed', 'bar-ai'].forEach(id => document.getElementById(id).style.width = '0%');
+      ['bar-fixed-val', 'bar-ai-val'].forEach(id => document.getElementById(id).textContent = '0');
+      document.getElementById('compare-progress-fill').style.width = '0%';
+      document.getElementById('compare-time-remaining').textContent = '00:60';
+      document.getElementById('winner-banner').classList.remove('visible');
+      document.getElementById('ct-lane-fixed').textContent = '—'; document.getElementById('ct-lane-ai').textContent = '—';
+      document.getElementById('ct-val-fixed').textContent = '—'; document.getElementById('ct-val-ai').textContent = '—';
+      document.getElementById('lane-breakdown-fixed').innerHTML = ''; document.getElementById('lane-breakdown-ai').innerHTML = '';
+      const btn = document.getElementById('compare-start-btn'); btn.disabled = false; btn.textContent = '▶ Start Comparison';
+    }
+
+    function runCmpTick() {
+      if (!cmpRunning || cmpTick >= CMP_MAX) { finishComparison(); return; }
+      fixedState = cmpFixed.tick(); aiState = cmpAI.tick(); cmpTick++;
+
+      const pct = (cmpTick / CMP_MAX) * 100, rem = CMP_MAX - cmpTick;
+      document.getElementById('compare-progress-fill').style.width = pct + '%';
+      document.getElementById('compare-time-remaining').textContent = '00:' + String(rem).padStart(2, '0');
+
+      const vF = fixedState.stats.vehicles_passed, vA = aiState.stats.vehicles_passed;
+      document.getElementById('vpd-fixed').textContent = vF;
+      document.getElementById('vpd-ai').textContent = vA;
+
+      const maxV = Math.max(vF, vA, 1);
+      document.getElementById('bar-fixed').style.width = ((vF / maxV) * 100) + '%';
+      document.getElementById('bar-ai').style.width = ((vA / maxV) * 100) + '%';
+      document.getElementById('bar-fixed-val').textContent = vF;
+      document.getElementById('bar-ai-val').textContent = vA;
+
+      const lnames = { N: 'North', S: 'South', E: 'East', W: 'West' };
+      document.getElementById('ct-lane-fixed').textContent = lnames[fixedState.active_lane];
+      document.getElementById('ct-lane-ai').textContent = lnames[aiState.active_lane];
+      document.getElementById('ct-val-fixed').textContent = fixedState.timer;
+      document.getElementById('ct-val-ai').textContent = aiState.timer;
+
+      const circ = 163.4;
+      document.getElementById('ct-ring-fixed').style.strokeDashoffset = circ * (1 - Math.min(1, fixedState.timer / 30));
+      document.getElementById('ct-ring-ai').style.strokeDashoffset = circ * (1 - Math.min(1, aiState.timer / 18));
+
+      updateLaneBreakdown('lane-breakdown-fixed', fixedState, 'fixed');
+      updateLaneBreakdown('lane-breakdown-ai', aiState, 'ai');
+    }
+
+    function updateLaneBreakdown(elId, state, type) {
+      const col = type === 'fixed' ? 'var(--red)' : 'var(--green)';
+      const label = type === 'fixed' ? '🔴 Fixed — Queue' : '🟢 AI — Queue';
+      const maxQ = Math.max(...['N', 'S', 'E', 'W'].map(l => { const d = state.lanes[l]; return d.cars + d.trucks + d.buses; }), 1);
+      const lnames = { N: 'North', S: 'South', E: 'East', W: 'West' };
+      let html = `<div style="font-size:11px;color:${col};font-weight:700;margin-bottom:6px;">${label}</div>`;
+      for (const l of ['N', 'S', 'E', 'W']) {
+        const d = state.lanes[l], tot = d.cars + d.trucks + d.buses, pct = Math.min(100, (tot / maxQ) * 100), isG = l === state.active_lane;
+        html += `<div style="display:grid;grid-template-columns:40px 1fr 32px;align-items:center;gap:8px;margin-bottom:5px;">
+      <span style="font-size:11px;font-weight:700;color:${isG ? col : 'var(--text-muted)'}">${lnames[l]}</span>
+      <div style="height:14px;background:rgba(255,255,255,0.04);border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:${isG ? col : 'rgba(255,255,255,0.15)'};border-radius:4px;transition:width 0.5s ease;"></div>
+      </div>
+      <span style="font-size:11px;font-family:var(--mono);text-align:right;color:var(--text-muted)">${tot}</span>
+    </div>`;
+      }
+      document.getElementById(elId).innerHTML = html;
+    }
+
+    function finishComparison() {
+      clearInterval(cmpInterval); cmpRunning = false;
+      const btn = document.getElementById('compare-start-btn'); btn.disabled = false; btn.textContent = '▶ Run Again';
+      const vF = fixedState ? fixedState.stats.vehicles_passed : 0, vA = aiState ? aiState.stats.vehicles_passed : 0;
+      const diff = vF > 0 ? Math.round(((vA - vF) / vF) * 100) : 0;
+      const banner = document.getElementById('winner-banner');
+      if (vA > vF) {
+        document.getElementById('winner-title').textContent = '🏆 AI Dynamic Timing Wins!';
+        document.getElementById('winner-pct').textContent = '+' + diff + '%';
+        document.getElementById('winner-desc').textContent = 'more vehicles cleared (' + vA + ' vs ' + vF + ') over fixed 30-second timing';
+        banner.style.background = 'linear-gradient(135deg,rgba(0,220,130,0.2),rgba(0,220,130,0.05))';
+        banner.style.borderColor = 'rgba(0,220,130,0.4)';
+        document.getElementById('winner-pct').style.color = 'var(--green)';
+      } else if (vF > vA) {
+        document.getElementById('winner-title').textContent = '⚠ Fixed Timing Won This Round';
+        document.getElementById('winner-pct').textContent = '+' + Math.round(((vF - vA) / Math.max(vA, 1)) * 100) + '%';
+        document.getElementById('winner-desc').textContent = 'more vehicles by fixed (' + vF + ' vs ' + vA + ') — try again with different traffic';
+        banner.style.background = 'linear-gradient(135deg,rgba(255,184,48,0.2),rgba(255,184,48,0.05))';
+        banner.style.borderColor = 'rgba(255,184,48,0.4)';
+        document.getElementById('winner-pct').style.color = 'var(--amber)';
+      } else {
+        document.getElementById('winner-title').textContent = "🤝 It's a Tie!";
+        document.getElementById('winner-pct').textContent = '0%';
+        document.getElementById('winner-desc').textContent = 'identical performance this round';
+      }
+      banner.classList.add('visible');
+    }
+
+    /* ===============================================================
+       MINI CANVAS RENDERER (comparison page)
+       =============================================================== */
+    const cmpCtxF = document.getElementById('cmp-canvas-fixed').getContext('2d');
+    const cmpCtxA = document.getElementById('cmp-canvas-ai').getContext('2d');
+    const CMW = 480, CMH = 300, CMX = 240, CMY = 150, CMR = 60, CMLW = 20;
+    const cmpVehF = { N: [], S: [], E: [], W: [] }, cmpVehA = { N: [], S: [], E: [], W: [] };
+    const _rng = new SeededRandom(99);
+
+    function drawMiniRoad(ct, cw, ch, cx, cy, rw) {
+      ct.fillStyle = '#0d1117'; ct.fillRect(0, 0, cw, ch);
+      ct.fillStyle = '#1a1d2e';
+      ct.fillRect(0, cy - rw, cw, rw * 2); ct.fillRect(cx - rw, 0, rw * 2, ch);
+      ct.fillStyle = '#13151f'; ct.fillRect(cx - rw, cy - rw, rw * 2, rw * 2);
+      ct.strokeStyle = '#3a4460'; ct.lineWidth = 1; ct.setLineDash([10, 8]);
+      ct.beginPath(); ct.moveTo(0, cy); ct.lineTo(cx - rw, cy); ct.moveTo(cx + rw, cy); ct.lineTo(cw, cy); ct.stroke();
+      ct.beginPath(); ct.moveTo(cx, 0); ct.lineTo(cx, cy - rw); ct.moveTo(cx, cy + rw); ct.lineTo(cx, ch); ct.stroke();
+      ct.setLineDash([]);
+      ct.strokeStyle = 'rgba(240,244,255,0.5)'; ct.lineWidth = 2;
+      ct.beginPath(); ct.moveTo(cx - rw + 3, cy - rw); ct.lineTo(cx + rw - 3, cy - rw); ct.stroke();
+      ct.beginPath(); ct.moveTo(cx - rw + 3, cy + rw); ct.lineTo(cx + rw - 3, cy + rw); ct.stroke();
+      ct.beginPath(); ct.moveTo(cx + rw, cy - rw + 3); ct.lineTo(cx + rw, cy + rw - 3); ct.stroke();
+      ct.beginPath(); ct.moveTo(cx - rw, cy - rw + 3); ct.lineTo(cx - rw, cy + rw - 3); ct.stroke();
+    }
+
+    function drawMiniLight(ct, x, y, state) {
+      ct.fillStyle = '#1a1d2e';
+      ct.beginPath(); ct.roundRect(x - 9, y - 24, 18, 48, 3); ct.fill();
+      ct.fillStyle = state === 'red' ? '#ff3b5c' : 'rgba(255,59,92,0.18)';
+      if (state === 'red') { ct.shadowColor = '#ff3b5c'; ct.shadowBlur = 8; }
+      ct.beginPath(); ct.arc(x, y - 12, 5, 0, Math.PI * 2); ct.fill(); ct.shadowBlur = 0;
+      ct.fillStyle = state === 'green' ? '#00dc82' : 'rgba(0,220,130,0.18)';
+      if (state === 'green') { ct.shadowColor = '#00dc82'; ct.shadowBlur = 10; }
+      ct.beginPath(); ct.arc(x, y + 12, 5, 0, Math.PI * 2); ct.fill(); ct.shadowBlur = 0;
+    }
+
+    function drawMiniVehicle(ct, x, y, dir, type, ci) {
+      const cols = { car: ['#3b9eff', '#b06bff', '#ffb830', '#ff6b9d'], truck: ['#ff8c42'], bus: ['#00e5ff'] };
+      const col = (cols[type] || cols.car)[ci % (cols[type] || cols.car).length];
+      const isH = dir === 'E' || dir === 'W';
+      let vw = type === 'bus' ? 15 : 11, vh = type === 'bus' ? 25 : type === 'truck' ? 22 : 18;
+      if (isH) { [vw, vh] = [vh, vw]; }
+      ct.fillStyle = col; ct.shadowColor = col; ct.shadowBlur = 4;
+      ct.beginPath(); ct.roundRect(x - vw / 2, y - vh / 2, vw, vh, 2); ct.fill(); ct.shadowBlur = 0;
+    }
+
+    function renderMini(ct, state, veh, cw, ch, cx, cy, rw, lw) {
+      if (!state) {
+        ct.fillStyle = '#030508'; ct.fillRect(0, 0, cw, ch);
+        ct.fillStyle = 'rgba(255,255,255,0.15)'; ct.font = '12px Inter,sans-serif'; ct.textAlign = 'center';
+        ct.fillText('Press ▶ Start Comparison', cw / 2, ch / 2); return;
+      }
+      drawMiniRoad(ct, cw, ch, cx, cy, rw);
+      const LMAP = {
+        N: { axis: 'y', dir: 1, bx: cx + lw / 2, by: 0, stop: cy - rw - 4 },
+        S: { axis: 'y', dir: -1, bx: cx - lw / 2, by: ch, stop: cy + rw + 4 },
+        E: { axis: 'x', dir: -1, bx: cw, by: cy + lw / 2, stop: cx + rw + 4 },
+        W: { axis: 'x', dir: 1, bx: 0, by: cy - lw / 2, stop: cx - rw - 4 },
+      };
+      const sp = 28;
+      for (const k of ['N', 'S', 'E', 'W']) {
+        const lane = state.lanes[k]; if (!lane) continue;
+        const cfg = LMAP[k], isG = lane.light === 'green', tot = lane.cars + lane.trucks + lane.buses;
+
+        // 1. Remove off-screen crossing vehicles
+        veh[k] = veh[k].filter(v => {
+          if (v.status === 'crossing') {
+            if (cfg.axis === 'y') return cfg.dir > 0 ? v.y < ch + 50 : v.y > -50;
+            else return cfg.dir > 0 ? v.x < cw + 50 : v.x > -50;
+          }
+          return true;
+        });
+
+        // 2. Adjust status of waiting vehicles to match queue size (tot)
+        let waiting = veh[k].filter(v => v.status === 'waiting');
+        while (waiting.length > tot) {
+          const firstWaiting = veh[k].find(v => v.status === 'waiting');
+          if (firstWaiting) firstWaiting.status = 'crossing';
+          waiting = veh[k].filter(v => v.status === 'waiting');
+        }
+        while (waiting.length < tot) {
+          const types = ['car', 'car', 'car', 'truck', 'bus'], t = types[Math.floor(_rng.random() * types.length)];
+          let newV = { type: t, ci: Math.floor(_rng.random() * 4), status: 'waiting' };
+          if (cfg.axis === 'y') {
+            newV.x = cfg.bx + (_rng.random() - 0.5) * 6;
+            if (cfg.dir > 0) newV.y = waiting.length > 0 ? Math.min(-sp, waiting[waiting.length - 1].y - sp) : -sp;
+            else newV.y = waiting.length > 0 ? Math.max(ch + sp, waiting[waiting.length - 1].y + sp) : ch + sp;
+          } else {
+            newV.y = cfg.by + (_rng.random() - 0.5) * 6;
+            if (cfg.dir < 0) newV.x = waiting.length > 0 ? Math.max(cw + sp, waiting[waiting.length - 1].x + sp) : cw + sp;
+            else newV.x = waiting.length > 0 ? Math.min(-sp, waiting[waiting.length - 1].x - sp) : -sp;
+          }
+          veh[k].push(newV);
+          waiting = veh[k].filter(v => v.status === 'waiting');
+        }
+
+        // 2b. JUNCTION ESCAPE: any 'waiting' vehicle inside the intersection box gets promoted to crossing
+        veh[k].forEach(v => {
+          if (v.status !== 'waiting') return;
+          const inJunction = Math.abs(v.x - cx) < rw && Math.abs(v.y - cy) < rw;
+          if (inJunction) v.status = 'crossing';
+        });
+
+        // 3. Move and draw vehicles
+        let waitingIdx = 0;
+        veh[k].forEach(v => {
+          if (v.status === 'crossing') {
+            const spd = 1.8 * 1.5;
+            if (cfg.axis === 'y') v.y += cfg.dir * spd;
+            else v.x += cfg.dir * spd;
+          } else {
+            const spd = isG ? 1.8 : 1.0;
+            if (cfg.axis === 'y') {
+              const stop = cfg.dir > 0 ? cfg.stop - waitingIdx * sp : cfg.stop + waitingIdx * sp;
+              if (cfg.dir > 0) { if (v.y < stop) v.y = Math.min(stop, v.y + spd); }
+              else { if (v.y > stop) v.y = Math.max(stop, v.y - spd); }
+            } else {
+              const stop = cfg.dir < 0 ? cfg.stop + waitingIdx * sp : cfg.stop - waitingIdx * sp;
+              if (cfg.dir < 0) { if (v.x > stop) v.x = Math.max(stop, v.x - spd); }
+              else { if (v.x < stop) v.x = Math.min(stop, v.x + spd); }
+            }
+            waitingIdx++;
+          }
+          drawMiniVehicle(ct, v.x, v.y, k, v.type, v.ci);
+        });
+      }
+      // Traffic lights
+      const lf = k => k === state.active_lane ? 'green' : 'red';
+      drawMiniLight(ct, cx - rw - 14, cy - rw - 18, lf('N'));
+      drawMiniLight(ct, cx + rw + 14, cy + rw + 18, lf('S'));
+      drawMiniLight(ct, cx + rw + 18, cy - rw - 14, lf('E'));
+      drawMiniLight(ct, cx - rw - 18, cy + rw + 14, lf('W'));
+      // Labels
+      const lnames = { N: 'N', S: 'S', E: 'E', W: 'W' };
+      const lpos = { N: [cx + rw + 6, 18], S: [cx - rw - 22, ch - 6], E: [cw - 22, cy - rw - 6], W: [6, cy + rw + 16] };
+      for (const k of ['N', 'S', 'E', 'W']) {
+        ct.fillStyle = lf(k) === 'green' ? '#00dc82' : '#ff3b5c';
+        ct.font = 'bold 9px Inter,sans-serif'; ct.textAlign = 'left';
+        ct.fillText(lnames[k] + '(' + state.lanes[k].weight + ')', lpos[k][0], lpos[k][1]);
+      }
+    }
+
+    function renderMiniLoop() {
+      renderMini(cmpCtxF, fixedState, cmpVehF, CMW, CMH, CMX, CMY, CMR, CMLW);
+      renderMini(cmpCtxA, aiState, cmpVehA, CMW, CMH, CMX, CMY, CMR, CMLW);
+      requestAnimationFrame(renderMiniLoop);
+    }
+    requestAnimationFrame(renderMiniLoop);
+
+    /* ===============================================================
+       MAIN SIMULATION CANVAS
+       =============================================================== */
+    const canvas = document.getElementById('sim-canvas'), ctx = canvas.getContext('2d');
+    const CW = canvas.width, CH = canvas.height, CX = CW / 2, CY = CH / 2, ROAD_W = 90, LANE_W = 28;
+    const C = { road: '#1a1d2e', asphalt: '#13151f', grass: '#0d1117', green: '#00dc82', red: '#ff3b5c', white: '#f0f4ff', dim: '#3a4460', car_1: '#3b9eff', car_2: '#b06bff', car_3: '#ffb830', car_4: '#ff6b9d', truck: '#ff8c42', bus: '#00e5ff', moto: '#a8ff3e' };
+    const vehicleState = { N: [], S: [], E: [], W: [] };
+    let frameCount = 0, lastTime = 0, fpsDisplay = 60;
+
+    function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r); ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r); ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r); ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath(); }
+
+    function drawMainRoad() {
+      ctx.fillStyle = C.grass; ctx.fillRect(0, 0, CW, CH);
+      ctx.fillStyle = C.road; ctx.fillRect(0, CY - ROAD_W, CW, ROAD_W * 2); ctx.fillRect(CX - ROAD_W, 0, ROAD_W * 2, CH);
+      ctx.fillStyle = C.asphalt; ctx.fillRect(CX - ROAD_W, CY - ROAD_W, ROAD_W * 2, ROAD_W * 2);
+      ctx.strokeStyle = C.dim; ctx.lineWidth = 1.5; ctx.setLineDash([14, 10]);
+      ctx.beginPath(); ctx.moveTo(0, CY); ctx.lineTo(CX - ROAD_W, CY); ctx.moveTo(CX + ROAD_W, CY); ctx.lineTo(CW, CY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(CX, 0); ctx.lineTo(CX, CY - ROAD_W); ctx.moveTo(CX, CY + ROAD_W); ctx.lineTo(CX, CH); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = C.white; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(CX - ROAD_W + 4, CY - ROAD_W); ctx.lineTo(CX + ROAD_W - 4, CY - ROAD_W); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(CX - ROAD_W + 4, CY + ROAD_W); ctx.lineTo(CX + ROAD_W - 4, CY + ROAD_W); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(CX + ROAD_W, CY - ROAD_W + 4); ctx.lineTo(CX + ROAD_W, CY + ROAD_W - 4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(CX - ROAD_W, CY - ROAD_W + 4); ctx.lineTo(CX - ROAD_W, CY + ROAD_W - 4); ctx.stroke();
+    }
+
+    function drawTrafficLight(x, y, state, label) {
+      const W = 22, H = 62, R = 8;
+      ctx.fillStyle = '#1a1d2e'; rrect(x - W / 2, y - H / 2, W, H, 5); ctx.fill();
+      ctx.strokeStyle = '#2a2d3e'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = state === 'red' ? C.red : 'rgba(255,59,92,0.15)';
+      if (state === 'red') { ctx.shadowColor = C.red; ctx.shadowBlur = 16; }
+      ctx.beginPath(); ctx.arc(x, y - 20, R, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = state === 'green' ? C.green : 'rgba(0,220,130,0.15)';
+      if (state === 'green') { ctx.shadowColor = C.green; ctx.shadowBlur = 18; }
+      ctx.beginPath(); ctx.arc(x, y + 20, R, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = C.white; ctx.font = 'bold 9px Inter,sans-serif'; ctx.textAlign = 'center'; ctx.fillText(label, x, y + H / 2 + 12);
+    }
+
+    function drawVehicle(x, y, dir, type, ci) {
+      const cols = { car: [C.car_1, C.car_2, C.car_3, C.car_4], truck: [C.truck], bus: [C.bus], motorcycle: [C.moto] };
+      const col = (cols[type] || cols.car)[ci % (cols[type]?.length || 4)];
+      const isH = dir === 'E' || dir === 'W';
+      let vw = type === 'motorcycle' ? 10 : type === 'bus' ? 18 : 14, vh = type === 'motorcycle' ? 18 : type === 'bus' ? 32 : type === 'truck' ? 28 : 22;
+      if (isH) { [vw, vh] = [vh, vw]; }
+      ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 6;
+      rrect(x - vw / 2, y - vh / 2, vw, vh, 3); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      if (!isH) ctx.fillRect(x - vw / 2 + 2, y - vh / 2 + 3, vw - 4, 5); else ctx.fillRect(x - vh / 2 + 3, y - vw / 2 + 2, 5, vw - 4);
+    }
+
+    function updateAndDrawVehicles() {
+      if (!simState) return;
+      const LM = {
+        N: { axis: 'y', dir: 1, bx: CX + LANE_W / 2, by: 0, stopY: CY - ROAD_W - 5 },
+        S: { axis: 'y', dir: -1, bx: CX - LANE_W / 2, by: CH, stopY: CY + ROAD_W + 5 },
+        E: { axis: 'x', dir: -1, bx: CW, by: CY + LANE_W / 2, stopX: CX + ROAD_W + 5 },
+        W: { axis: 'x', dir: 1, bx: 0, by: CY - LANE_W / 2, stopX: CX - ROAD_W - 5 },
+      };
+      const sp = 40;
+      ['N', 'S', 'E', 'W'].forEach(k => {
+        const lane = simState.lanes[k]; if (!lane) return;
+        const cfg = LM[k], isG = lane.light === 'green', tot = lane.cars + lane.trucks + lane.buses;
+
+        // 1. Remove off-screen crossing vehicles
+        vehicleState[k] = vehicleState[k].filter(v => {
+          if (v.status === 'crossing') {
+            if (cfg.axis === 'y') return cfg.dir > 0 ? v.y < CH + 60 : v.y > -60;
+            else return cfg.dir > 0 ? v.x < CW + 60 : v.x > -60;
+          }
+          return true;
+        });
+
+        // 2. Adjust status of waiting vehicles to match queue size (tot)
+        let waiting = vehicleState[k].filter(v => v.status === 'waiting');
+        while (waiting.length > tot) {
+          const firstWaiting = vehicleState[k].find(v => v.status === 'waiting');
+          if (firstWaiting) firstWaiting.status = 'crossing';
+          waiting = vehicleState[k].filter(v => v.status === 'waiting');
+        }
+        while (waiting.length < tot) {
+          const types = ['car', 'car', 'car', 'truck', 'bus'], t = types[Math.floor(Math.random() * types.length)];
+          let newV = { type: t, ci: Math.floor(Math.random() * 4), status: 'waiting' };
+          if (cfg.axis === 'y') {
+            newV.x = cfg.bx + (Math.random() - 0.5) * 10;
+            if (cfg.dir > 0) newV.y = waiting.length > 0 ? Math.min(-sp, waiting[waiting.length - 1].y - sp) : -sp;
+            else newV.y = waiting.length > 0 ? Math.max(CH + sp, waiting[waiting.length - 1].y + sp) : CH + sp;
+          } else {
+            newV.y = cfg.by + (Math.random() - 0.5) * 10;
+            if (cfg.dir < 0) newV.x = waiting.length > 0 ? Math.max(CW + sp, waiting[waiting.length - 1].x + sp) : CW + sp;
+            else newV.x = waiting.length > 0 ? Math.min(-sp, waiting[waiting.length - 1].x - sp) : -sp;
+          }
+          vehicleState[k].push(newV);
+          waiting = vehicleState[k].filter(v => v.status === 'waiting');
+        }
+
+        // 2b. JUNCTION ESCAPE: any 'waiting' vehicle that ended up inside the intersection box is stuck — promote it to crossing
+        vehicleState[k].forEach(v => {
+          if (v.status !== 'waiting') return;
+          const inJunction = Math.abs(v.x - CX) < ROAD_W && Math.abs(v.y - CY) < ROAD_W;
+          if (inJunction) v.status = 'crossing';
+        });
+
+        // 3. Move and draw vehicles
+        let waitingIdx = 0;
+        vehicleState[k].forEach(v => {
+          if (v.status === 'crossing') {
+            const spd = 2.5 * 1.5;
+            if (cfg.axis === 'y') v.y += cfg.dir * spd;
+            else v.x += cfg.dir * spd;
+          } else {
+            const spd = isG ? 2.5 : 1.5;
+            if (cfg.axis === 'y') {
+              const stop = cfg.dir > 0 ? cfg.stopY - waitingIdx * sp : cfg.stopY + waitingIdx * sp;
+              if (cfg.dir > 0) { if (v.y < stop) v.y = Math.min(stop, v.y + spd); }
+              else { if (v.y > stop) v.y = Math.max(stop, v.y - spd); }
+            } else {
+              const stop = cfg.dir < 0 ? cfg.stopX + waitingIdx * sp : cfg.stopX - waitingIdx * sp;
+              if (cfg.dir < 0) { if (v.x > stop) v.x = Math.max(stop, v.x - spd); }
+              else { if (v.x < stop) v.x = Math.min(stop, v.x + spd); }
+            }
+            waitingIdx++;
+          }
+          drawVehicle(v.x, v.y, k, v.type, v.ci);
+        });
+      });
+    }
+
+    function drawLaneLabels() {
+      if (!simState) return;
+      [{ key: 'N', x: CX + ROAD_W + 14, y: 60 }, { key: 'S', x: CX - ROAD_W - 60, y: CH - 30 }, { key: 'E', x: CW - 60, y: CY - ROAD_W - 14 }, { key: 'W', x: 10, y: CY + ROAD_W + 20 }].forEach(({ key, x, y }) => {
+        const lane = simState.lanes[key]; if (!lane) return;
+        ctx.fillStyle = lane.light === 'green' ? C.green : C.red; ctx.font = 'bold 11px Inter,sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(lane.name, x, y); ctx.fillStyle = 'rgba(240,244,255,0.5)'; ctx.font = '10px JetBrains Mono,monospace'; ctx.fillText('W:' + lane.weight, x, y + 14);
+      });
+    }
+
+    function renderLoop(ts) {
+      const dt = ts - lastTime; if (dt > 0) fpsDisplay = Math.round(1000 / dt); lastTime = ts; frameCount++;
+      ctx.clearRect(0, 0, CW, CH); drawMainRoad(); updateAndDrawVehicles();
+      const ls = simState ? { N: simState.lanes.N?.light || 'red', S: simState.lanes.S?.light || 'red', E: simState.lanes.E?.light || 'red', W: simState.lanes.W?.light || 'red' } : { N: 'red', S: 'red', E: 'red', W: 'red' };
+      drawTrafficLight(CX - ROAD_W - 22, CY - ROAD_W - 28, ls.N, 'N');
+      drawTrafficLight(CX + ROAD_W + 22, CY + ROAD_W + 28, ls.S, 'S');
+      drawTrafficLight(CX + ROAD_W + 28, CY - ROAD_W - 22, ls.E, 'E');
+      drawTrafficLight(CX - ROAD_W - 28, CY + ROAD_W + 22, ls.W, 'W');
+      drawLaneLabels();
+      if (simState?.emergency) { ctx.fillStyle = 'rgba(255,59,92,0.04)'; ctx.fillRect(0, 0, CW, CH); ctx.font = 'bold 14px Inter,sans-serif'; ctx.fillStyle = 'rgba(255,59,92,0.6)'; ctx.textAlign = 'center'; ctx.fillText('🚨 EMERGENCY CORRIDOR ACTIVE', CX, CH - 20); }
+      if (frameCount % 30 === 0) document.getElementById('sim-fps').textContent = fpsDisplay + ' FPS';
+      requestAnimationFrame(renderLoop);
+    }
+    requestAnimationFrame(renderLoop);
+
+    setInterval(() => {
+      const el = document.getElementById('yolo-frame-counter');
+      el.textContent = 'Frame: ' + (parseInt(el.textContent.replace('Frame: ', '') || 0) + 1);
+    }, 33);
+  </script>
+</body>
+
+</html>
