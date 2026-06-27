@@ -82,7 +82,7 @@ Features include:
 # 🏗 Project Architecture
 
 ```text
-Sample Videos
+Sample Videos/ Real time video 
       │
       ▼
 YOLOv8 Detection Engine
@@ -119,14 +119,7 @@ smart-city-traffic-management/
 │
 ├── sample_videos/
 │
-├── static/
-│   ├── image.png
-│   ├── image copy.png
-│   ├── image copy2.png
-│   ├── image copy3.png
-│   ├── image copy4.png
-│   ├── image copy5.png
-│   └── ...
+├
 │
 ├── simulation-demo.mp4
 ├── requirements.txt
@@ -193,7 +186,7 @@ http://127.0.0.1:5000
 ### Computer Vision
 
 * OpenCV
-* Ultralytics YOLOv8
+* Ultralytics YOLOv8nano
 
 ### Frontend
 
