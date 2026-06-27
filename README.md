@@ -132,7 +132,7 @@ smart-city-traffic-management/
 Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/smart-city-traffic-management.git
+git clone https://github.com/tdizhere/smart-city-traffic-management.git
 cd smart-city-traffic-management
 ```
 
